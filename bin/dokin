@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+if [ "`echo $0 | cut -c1`" = "/" ]; then
+  _my_path=`dirname $0`
+else
+  _my_path=`pwd`/`dirname $0`
+fi
+_php=`which php`
+${_php} ${_my_path}/dokin.php $@
+
