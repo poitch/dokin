@@ -26,6 +26,7 @@ class Model
     {
         if (is_scalar($mObj)) {
             // TODO load using idfield
+
         } else if (is_array($mObj)) {
             foreach ($mObj as $sKey => $sValue) {
                 if (in_array($sKey, $this->aFields)) {
@@ -98,9 +99,17 @@ class Model
 
 
 
-    public static function get_instance($sClass, $mObj = null)
+    public static function get_instance($sClass, $mObj = null, $oDriver = null)
     {
-        return new $sClass($mObj);
+        $oTmp = new $sClass($mObj);
+
+        $sIdField = $oTmp->sIdField;
+        if (!$oTmp->$sIdField && $oDriver !== null) {
+            $mRes = $oTmp->select($sClass)->where($sIdField, $mObj)->exec($oDriver);
+            $oTmp = $mRes->fetch();
+        }
+
+        return $oTmp;
     }
 
     public function getDB()
@@ -165,15 +174,15 @@ class Model
     {
         // TODO
         //build the set tree here?
-        /*
-        if (!is_array($this->aSet)) {
-            foreach ($this->aFields as $sKey) {
-                if ($this->hValues[$sKey] !== $this->hLoadedValues[$sKey]) {
-                    $this->aSet[$sKey] = $this->hValues[$sKey];
+        if ($this && is_subclass_of($this, 'Model')) {
+            if (!is_array($this->aSet)) {
+                foreach ($this->aFields as $sKey) {
+                    if ($this->hValues[$sKey] !== $this->hLoadedValues[$sKey]) {
+                        $this->aSet[$sKey] = $this->hValues[$sKey];
+                    }
                 }
             }
         }
-        */
 
         if (!$this || !is_subclass_of($this, 'Model')) {
             $oObj = self::get_instance($mClass);

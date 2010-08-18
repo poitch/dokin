@@ -13,7 +13,6 @@ abstract class SQLBaseDriver extends DBDriver
     public function exec($oModel)
     {
         $hTree = $oModel->getTree();
-
         $sClass = get_class($oModel);
         $sTable = $oModel->getTable();
         $sCommand = $hTree['COMMAND'];
