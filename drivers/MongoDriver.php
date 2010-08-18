@@ -23,17 +23,28 @@ class MongoDriver extends DBDriver
         $hWhere = $hTree['WHERE'];
 
         $hWhere = is_array($hWhere) ? $hWhere : array();
+        $hSafe = array('safe' => true);
 
         if ($sCommand == SQL_COMMAND_SELECT) {
             $oCursor = $this->db->$sDB->$sCollection->find($hWhere);
             return new MongoDBResult($oCursor, $sClass);
         } else if ($sCommand == SQL_COMMAND_INSERT || $sCommand == SQL_COMMAND_UPDATE) {
             $hObj = $oModel->toHash();
-            $mRes = $this->db->$sDB->$sCollection->save($hObj, array('safe' => true));
-            if (is_object($hObj)) {
+            print $sCommand.print_r($hObj, 1);
+            $mRes = $this->db->$sDB->$sCollection->save($hObj, $hSafe);
+            if (is_object($hObj['_id'])) {
                 $oModel->_id = $hObj['_id']->__toString();
             }
             return $oModel;
+        } else if ($sCommand == SQL_COMMAND_DELETE) {
+            if (isset($hWhere['_id'])) {
+                $hWhere['_id'] = new MongoId($hWhere['_id']);
+            }
+            $res = $this->db->$sDB->$sCollection->remove($hWhere, $hSafe);
+            if (!$res['ok']) {
+                throw new Exception($res['err']);
+            }
+            return true;
         }
     }
 

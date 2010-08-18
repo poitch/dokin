@@ -75,6 +75,56 @@ class MongoTest extends PHPUnit_Framework_TestCase
         $this->assertEquals(true, $mRes);
     }
 
+    public function testDeleteSingle()
+    {
+        $oDriver = DBDriver::get_instance('mongo');
+
+        // Clean up database
+        Person::delete('Person')->where('firstName', 'Jerome')->exec($oDriver);
+
+        $oPerson = new Person();
+        $oPerson->firstName = 'Jerome';
+        $oPerson->lastName = 'Poichet';
+        $mRes = $oPerson->insert()->exec($oDriver);
+        $this->assertNotNull($mRes);
+        $this->assertNotNull($oPerson->_id);
+        $this->assertNotNull($mRes->_id);
+
+        $oRes = Person::select('Person')->where('firstName', 'Jerome')->exec($oDriver);
+        $oOther = $oRes->fetch();
+        $this->assertEquals($oPerson->_id, $oOther->_id);
+
+        $oPerson->delete($oDriver);
+
+        $oRes = Person::select('Person')->where('firstName', 'Jerome')->exec($oDriver);
+        $oOther = $oRes->fetch();
+        $this->assertNull($oOther);
+    }
+
+    public function testDeleteMultiple()
+    {
+        $oDriver = DBDriver::get_instance('mongo');
+
+        // Clean up database
+        Person::delete('Person')->where('firstName', 'Jerome')->exec($oDriver);
+
+        $iCount = 10;
+        for ($i = 0; $i < $iCount; $i++) {
+            $oPerson = new Person();
+            $oPerson->firstName = 'Jerome';
+            $oPerson->lastName = 'Poichet';
+            $mRes = $oPerson->insert()->exec($oDriver);
+        }
+
+        $oRes = Person::select('Person')->where('firstName', 'Jerome')->exec($oDriver);
+        $this->assertEquals($iCount, $oRes->numRows());
+ 
+        Person::delete('Person')->where('firstName', 'Jerome')->exec($oDriver);
+
+        $oRes = Person::select('Person')->where('firstName', 'Jerome')->exec($oDriver);
+        $this->assertEquals(0, $oRes->numRows());
+    }
+
 
 }
 

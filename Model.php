@@ -1,514 +1,268 @@
 <?php
-/**
- *****************************************************************************
- ** Copyright (c) 2007-2009 Jerome Poichet <jerome@frencaze.com>
- **
- ** This software is supplied to you by Jerome Poichet in consideration of 
- ** your agreement to the following terms, and your use, installation, 
- ** modification or redistribution of this software constitutes acceptance of 
- ** these terms. If you do not agree with these terms, please do not use, 
- ** install, modify or redistribute this software.
- **
- ** In consideration of your agreement to abide by the following terms, and 
- ** subject to these terms, Jerome Poichet grants you a personal, non-exclusive
- ** license, to use, reproduce, modify and redistribute the software, with or 
- ** without modifications, in source and/or binary forms; provided that if you
- ** redistribute the software in its entirety and without modifications, you 
- ** must retain this notice and the following text and disclaimers in all such 
- ** redistributions of the software, and that in all cases attribution of 
- ** Jerome Poichet as the original author of the source code shall be included
- ** in all such resulting software products or distributions.
- **
- ** Neither the name, trademarks, service marks or logos of Jerome Poichet may
- ** be used to endorse or promote products derived from the software without 
- ** specific prior written permission from Jerome Poichet. Except as expressly
- ** stated in this notice, no other rights or licenses, express or implied, are
- ** granted by Jerome Poichet herein, including but not limited to any patent
- ** rights that may be infringed by your derivative works or by other works in
- ** which the software may be incorporated.
- ** 
- ** The software is provided by Jerome Poichet on an "AS IS" basis. 
- ** JEROME POICHET MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT 
- ** LIMITATION THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND 
- ** FITNESS FOR A PARTICULAR PURPOSE, REGARDING THE SOFTWARE OR ITS USE AND 
- ** OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
- ** 
- ** IN NO EVENT SHALL JEROME POICHET BE LIABLE FOR ANY SPECIAL, INDIRECT, 
- ** INCIDENTAL OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
- ** PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- ** OR BUSINESS INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
- ** MODIFICATION AND/OR DISTRIBUTION OF THE SOFTWARE, HOWEVER CAUSED AND 
- ** WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT 
- ** LIABILITY OR OTHERWISE, EVEN IF JEROME POICHET HAS BEEN ADVISED OF THE 
- ** POSSIBILITY OF SUCH DAMAGE.
- *****************************************************************************
- **/
-require_once DOKIN_DIR.'DB.php';
+require_once DOKIN_DIR.'DBDriver.php';
 
-class Model 
+define('SQL_COMMAND_NONE', 'NONE');
+define('SQL_COMMAND_SELECT', 'SELECT');
+define('SQL_COMMAND_DELETE', 'DELETE');
+define('SQL_COMMAND_UPDATE', 'UPDATE');
+
+class Model
 {
-    protected $name;
-    protected $fields = array();
-    protected $idField;
-    protected $values = array();
-    protected $loaded_values = array();
+    protected $sDatabase;
+    protected $sTable;
+    protected $sIdField;
+    protected $aFields = array();
 
-    protected $extraValues = array();
+    protected $hValues = array();
+    protected $hLoadedValues = array();
+    protected $hExtraValues = array();
 
-    private static $__debug_cache = false;
+    protected $sCommand;
+    protected $aAnd = null;
+    protected $aOr = null;
+    protected $aSet = null;
 
-    public $bDirty = false;
-
-    public function __construct($m = null) 
+    public function __construct($mObj = null)
     {
-        if (is_scalar($m)) {
-            $this->values[$this->idField] = $m;
-            $oDB = DB::get_instance('slave');
-            $this->load($oDB);
-            Model::__cache_add($this);
-        } else if (is_array($m)) {
-            foreach ($m as $k => $v) {
-                if (in_array($k,$this->fields)) {
-                    $this->values[$k]        = $v;
-                    $this->loaded_values[$k] = $v;
+        if (is_scalar($mObj)) {
+            // TODO load using idfield
+        } else if (is_array($mObj)) {
+            foreach ($mObj as $sKey => $sValue) {
+                if (in_array($sKey, $this->aFields)) {
+                    $this->hValues[$sKey] = $sValue;
+                    $this->hLoadedValues[$sKey] = $sValue;
                 } else {
-                    $this->extraValues[$k]   = $v;
+                    $this->hExtraValues[$sKey] = $sValue;
                 }
             }
-            Model::__cache_add($this);
-
-        } else if (is_object($m)) {
-            foreach ($this->fields as $sField) {
-                if ($m->$sField) {
-                    $this->values[$sField]        = $m->$sField;
-                    $this->loaded_values[$sField] = $m[$sField];
-                }
-            } 
         }
     }
 
-    public function get($key) 
+    public function getFields()
     {
-        if (in_array($key,$this->fields)) {
-            return $this->values[$key];
+        return $this->aFields;
+    }
+
+    public function getValues()
+    {
+        return $this->hValues;
+    }
+
+
+    public function _get($sKey) 
+    {
+        if (in_array($sKey, $this->aFields)) {
+            return $this->hValues[$sKey];
         } else {
-            return $this->extraValues[$key];
+            return $this->hExtraValues[$sKey];
         }
     }
 
-    public function set($key,$value) 
+    public function _set($sKey, $sValue) 
     {
-        if (in_array($key,$this->fields)) {
-            $this->values[$key] = $value;
-            if ($this->loaded_values[$key] !== $this->values[$key]) {
-                $this->bDirty = true;
+        if (in_array($sKey, $this->aFields)) {
+            $this->hValues[$sKey] = $sValue;
+            if ($this->hLoadedValues[$sKey] !== $this->hValues[$sKey]) {
             }
         } else {
-            $this->extraValues[$key] = $value;
+            // Do not set as extra value if an object's attribute
+            $oReflect = new ReflectionClass($this);
+            $aProps = $oReflect->getProperties(ReflectionProperty::IS_PROTECTED | ReflectionProperty::IS_PRIVATE);
+            foreach ($aProps as $hProp) {
+                if ($hProp->name == $sKey) {
+                    trigger_error($sKey.' is not a public member', E_USER_ERROR);
+                }
+            }
+            print_r($aProps);
+
+            $this->hExtraValues[$sKey] = $sValue;
         }
     }
 
-    public function remove($key)
+    public function remove($sKey)
     {
-        if (in_array($key,$this->fields)) {
-            unset($this->values[$key]);
+        unset($this->hValues[$sKey]);
+        //unset($this->hLoadedValues[$sKey]);
+        unset($this->hExtraValues[$sKey]);
+    }
+
+    public function __get($sName) 
+    {
+        return $this->_get($sName);
+    }
+
+    public function __set($sName, $sValue) 
+    {
+        return $this->_set($sName, $sValue);
+    }
+
+
+
+    public static function get_instance($sClass, $mObj = null)
+    {
+        return new $sClass($mObj);
+    }
+
+    public function getDB()
+    {
+        return $this->sDatabase;
+    }
+
+
+    public function getTable()
+    {
+        return $this->sTable;
+    }
+
+    public function getTree()
+    {
+        return array(
+            'COMMAND' => $this->sCommand, 
+            'WHERE' => $this->aAnd,
+            'SET' => $this->aSet,
+            'IDFIELD' => $this->sIdField,
+        );
+    }
+
+    public static function select($sClass)
+    {
+        $oObj = self::get_instance($sClass);
+        $oObj->sCommand = SQL_COMMAND_SELECT;
+        return $oObj;
+    }
+
+    public function insert($mDriver = null)
+    {
+        $this->sCommand = SQL_COMMAND_INSERT;
+        if ($mDriver !== null && is_subclass_of($mDriver, 'DBDriver')) {
+            return $this->exec($mDriver);
+        }
+        return $this;
+    }
+    
+    public function delete($mClass = null)
+    {
+        if (!$this || !is_subclass_of($this, 'Model')) {
+            if ($mClass === null) {
+                trigger_error('Provide class name', E_USER_ERROR);
+            }
+            $oObj = self::get_instance($mClass);
+            $oObj->sCommand = SQL_COMMAND_DELETE;
         } else {
-            unset($this->extraValues[$key]);
+            $oObj = $this;
+            $oObj->sCommand = SQL_COMMAND_DELETE;
+            // for the id_field = id
+            $mId = $oObj->sIdField;
+            $oObj->where($mId, $oObj->$mId);
+            if ($mClass !== null && is_subclass_of($mClass, 'DBDriver')) {
+                return $oObj->exec($mClass);
+            }
         }
+        return $oObj;
     }
 
-    public function load($oDB = null) 
+    public function update($mClass = null)
     {
-        if ($oDB === null) {
-            $oDB = DB::get_instance('slave');
+        // TODO
+        //build the set tree here?
+        /*
+        if (!is_array($this->aSet)) {
+            foreach ($this->aFields as $sKey) {
+                if ($this->hValues[$sKey] !== $this->hLoadedValues[$sKey]) {
+                    $this->aSet[$sKey] = $this->hValues[$sKey];
+                }
+            }
         }
+        */
 
-        $sQuery  = 'SELECT '.implode(',',$this->fields).' FROM '.$this->name;
-        $sQuery .= ' WHERE '.$this->idField.' = \''.mysql_real_escape_string($this->values[$this->idField]).'\'';
-        $oResult = $oDB->query($sQuery);
-        if ($oResult->numRows() == 1) {
-            $this->values = $oResult->fetch();
-            $this->loaded_values = $this->values;
+        if (!$this || !is_subclass_of($this, 'Model')) {
+            $oObj = self::get_instance($mClass);
+            $oObj->sCommand = SQL_COMMAND_UPDATE;
         } else {
-            $sMsg = $this->values[$this->idField].' not found in '.$this->name;
-            _ERROR($sMsg);
-            return null;
-            //throw new Exception($sMsg);
+            $oObj = $this;
+            $oObj->sCommand = SQL_COMMAND_UPDATE;
+            // for the id_field = id
+            $mId = $oObj->sIdField;
+            $oObj->where($mId, $oObj->$mId);
+            if ($mClass !== null && is_subclass_of($mClass, 'DBDriver')) {
+                return $oObj->exec($mClass);
+            }
         }
+        return $oObj;
     }
 
-    public function insert($oDB = null) 
+    public function set($mKey, $mValue = null)
     {
-        if ($oDB === null) {
-            $oDB = DB::get_instance('master');
+        if (!is_array($mKey)) {
+            $mKey = array($mKey => $mValue);
         }
-        $hFields = array();
-        $hValues = array();
-        foreach ($this->fields as $field) {
-            if (isset($this->values[$field])) {
-                $hFields[] = $field;
-                $hValues[] = mysql_real_escape_string($this->values[$field]);
-            } else {
-                unset($this->values[$field]);
-            }
-        }
-
-        $sQuery  = 'INSERT INTO '.$this->name.' ';
-        $sQuery .= '('.implode(',',$hFields).') VALUES ';
-        $sQuery .= '(\''.implode('\',\'',$hValues).'\')';
-        $sQuery = str_replace('\'NOW()\'','NOW()',$sQuery);
-
-        try {
-            $oDB->query($sQuery);
-        } catch( Exception $e ) {
-            _ERROR($e->getMessage());
-            throw $e;
-        }
-
-        $this->values[$this->idField] = mysql_insert_id();
-        if ($this->values[$this->idField]) {
-            $this->loaded_values = $this->values;
-        }
-
-        Model::__cache_add($this);
-
-        return $this->values[$this->idField];
+        $this->aSet = is_array($this->aSet) ? $this->aSet : array();
+        $this->aSet = array_merge($this->aSet, $mKey);
+        return $this;
     }
 
-    public function update($oDB = null ) 
+    public function where($mKey, $mValue = null)
     {
-        if ($oDB === null) {
-            $oDB = DB::get_instance('master');
-        }
-        $hValues = array();
-        foreach ($this->fields as $key) {
-            if ($this->loaded_values[$key] !== $this->values[$key]) {
-                if ($this->values[$key] === 'NOW()') {
-                    $hValues[] = $key.'= NOW()';
-                } else if ($this->values[$key] === 'INCREMENT()') {
-                    $hValues[] = $key.'='.$key.'+1';
-                } else if ($this->values[$key] === NULL) {
-                    $hValues[] = $key.'= NULL';
-                } else {
-                    $hValues[] = $key.'=\''.mysql_real_escape_string($this->values[$key]).'\'';
-                }
-            }
-        }
-
-        if (!sizeof($hValues)) {
-            // WARNING MAYBE?
-            _WARN('nothing to update in '.get_class());
-            return false;
-        }
-
-        $sQuery  = 'UPDATE '.$this->name.' SET ';
-        $sQuery .= implode(',',$hValues);
-        $sQuery .= ' WHERE '.$this->idField.' = \''.mysql_real_escape_string($this->loaded_values[$this->idField]).'\'';
-
-        try {
-            $oDB->query($sQuery);
-        } catch ( Exception $e ) {
-            _ERROR($e->getMessage());
-            throw $e;
-        }
-
-        Model::__cache_update($this);
-
-        return true;
+        return $this->andWhere($mKey, $mValue);
     }
 
-    public function delete($oDB = null) 
+    public function andWhere($mKey, $mValue = null)
     {
-        if ($oDB === null) {
-            $oDB = DB::get_instance('master');
+        if (!is_array($mKey)) {
+            $mKey = array($mKey => $mValue);
         }
-        $sQuery  = 'DELETE FROM '.$this->name.' WHERE ';
-        $sQuery .= $this->idField.' =\''.mysql_real_escape_string($this->loaded_values[$this->idField]).'\'';
-        try {
-            $oDB->query($sQuery);
-        } catch ( Exception $e ) {
-            _ERROR($e->getMessage());
-            throw $e;
-        }
-
-        Model::__cache_delete($this);
+        $this->aAnd = is_array($this->aAnd) ? $this->aAnd : array();
+        $this->aAnd = array_merge($this->aAnd, $mKey);
+        return $this;
     }
 
-    static public function find($sClass, $aWhere = array(), $aOrder = array(), $iOffset = null, $iLimit = null, $oDB = null)
+    public function orWhere()
     {
-        if (!sizeof($aWhere)) {
-            return self::fetch_all($sClass,$iOffset,$iLimit,$oDB);
-        }
-
-        if (!Model::$__fields_cache[$sClass]['object']) {
-            Model::__get_fields($sClass);
-        }
-        $object = Model::$__fields_cache[$sClass]['object'];
-
-        if ($oDB === null) {
-            $oDB = DB::get_instance('slave');
-        }
-
-        $sQuery = 'SELECT * FROM '.$object->name;
-
-        $aParts = array();
-        foreach ($aWhere as $sKey => $sValue) {
-           if ($sValue === null) {
-                $aParts[] = $sKey . ' IS NULL ';
-            } else if (is_array($sValue)) {
-                $aIns = array();
-                foreach ($sValue as $sValue2) {
-                    $aIns[] .= '\''.mysql_real_escape_string($sValue2).'\'';
-                }
-                if (sizeof($aIns)) {
-                    $aParts[] = $sKey .= ' IN ('.implode(',', $aIns).')';
-                }
-            } else {
-                $aParts[] = $sKey .' = \''.mysql_real_escape_string($sValue).'\'';
-            }
-        }
-        if (sizeof($aParts)) {
-            $sQuery .= ' WHERE '.implode(' AND ',$aParts);
-        }
-
-        if ($aOrder && is_array($aOrder) && sizeof($aOrder)) {
-            $sQuery .= ' ORDER BY ';
-            foreach ($aOrder as $sKey => $sSort) {
-                if (is_numeric($sKey)) {
-                    $aOrderParts[] = $sSort;
-                } else {
-                    $aOrderParts[] = $sKey.' '.$sSort;
-                }
-            }
-            $sQuery .= implode(',', $aOrderParts);
-        }
-
-        if ($iLimit != null && is_numeric($iLimit)) {
-            if ($iOffset != null && is_numeric($iOffset) ) {
-                $sQuery .= ' LIMIT '.$iOffset.','.$iLimit;
-            } else {
-                $sQuery .= ' LIMIT '.$iLimit;
-            }
-        }
-
-        try {
-            $oResult = $oDB->query($sQuery);
-        } catch ( Exception $e ) {
-            _ERROR($e->getMessage());
-            throw $e;
-        }
-
-        $aResults = array();
-        while ($hResult = $oResult->fetch()) {
-            $aResults[] = new $sClass($hResult);
-        }
-
-        return $aResults;
-
+        return $this;
     }
 
-    static public function fetch_all($sClass, $iOffset = null, $iLimit = null, $oDB = null) 
+    public function like()
     {
-        if (!Model::$__fields_cache[$sClass]['object']) {
-            Model::__get_fields($sClass);
+        return $this;
+    }
+
+    public function limit()
+    {
+        return $this;
+    }
+
+    public function having()
+    {
+        return $this;
+    }
+
+    public function exec($oDriver = null)
+    {
+        if (!$oDriver) {
+            throw new Exception('Provide a DB Driver');
         }
-        $object = Model::$__fields_cache[$sClass]['object'];
-
-        if ($oDB === null) {
-            $oDB = DB::get_instance('slave');
-        }
-
-        $sQuery = 'SELECT * FROM '.$object->name;
-
-        if ($iLimit != null && is_numeric($iLimit)) {
-            if ($iOffset != null && is_numeric($iOffset)) {
-                $sQuery .= ' LIMIT '.$iOffset.','.$iLimit;
-            } else {
-                $sQuery .= ' LIMIT '.$iLimit;
-            }
-        }
-
-
-        try {
-            $oResult = $oDB->query($sQuery);
-        } catch ( Exception $e ) {
-            _ERROR($e->getMessage());
-            throw $e;
-        }
-
-        $aResults = array();
-        while ($hResult = $oResult->fetch()) {
-            $aResults[] = new $sClass($hResult);
-        }
-
-        return $aResults;
+        return $oDriver->exec($this);
     }
 
     public function toHash() 
     {
         $hRes = array();
-        foreach ($this->fields as $field) {
-            $hRes[$field] = $this->values[$field];
-            if ($this->extraValues[$field.'Object']) {
-                $hRes[$field] = $this->extraValues[$field.'Object']->toHash();
+        foreach ($this->aFields as $sField) {
+            if ($sField == $this->sIdField && !isset($this->hValues[$sField])) {
+            } else {
+                $hRes[$sField] = $this->hValues[$sField];
             }
         }
-        foreach ($this->extraValues as $key => $val) {
-            if (is_object($val) && is_subclass_of($val,'Model')) {
-                $hRes[$key] = $val->toHash();
-            } else if (!is_object($val)) {
-                $hRes[$key] = $val;
+        foreach ($this->hExtraValues as $sKey => $mVal) {
+            if (is_object($mVal) && is_subclass_of($mVal,'Model')) {
+                $hRes[$sKey] = $mVal->toHash();
+            } else if (!is_object($mVal)) {
+                $hRes[$sKey] = $mVal;
             }
         }
         return $hRes;
     }
 
-    public function getFields() 
-    {
-        return $this->fields;
-    }
 
-    public function getIdField() 
-    {
-        return $this->idField;
-    }
-
-    protected static $__object_cache;
-    public static $bCaching = true;
-
-    public static function get_instance($sClass,$iId) 
-    {
-        if (self::$bCaching) {
-            if (!Model::$__object_cache[$sClass][$iId]) {
-                if (Model::$__debug_cache) {
-                    _DEBUG('[C] creating '.$sClass.' '.$iId);
-                }
-                new $sClass($iId);
-            } else if (Model::$__debug_cache) {
-                _DEBUG('[C] hit '.$sClass.' '.$iId);
-            }
-            return Model::$__object_cache[$sClass][$iId];
-        } else {
-            return new $sClass($iId);
-        }
-    }
-
-    final private static function __cache_add($oObject) 
-    {
-        if (self::$bCaching) {
-            $sClass = get_class($oObject);
-            if (!Model::$__object_cache[$sClass][$oObject->get('id')]) {
-                if (Model::$__debug_cache) {
-                    _DEBUG('[C] adding '.$sClass.' '.$oObject->get('id'));
-                }
-                Model::$__object_cache[$sClass][$oObject->get('id')] = $oObject;
-            }
-        }
-    }
-
-    final private static function __cache_update($oObject) 
-    {
-        if (self::$bCaching) {
-            $sClass = get_class($oObject);
-            if (Model::$__debug_cache) {
-                _DEBUG('[C] updating '.$sClass.' '.$oObject->get('id'));
-            }
-            Model::$__object_cache[$sClass][$oObject->get('id')] = $oObject;
-        }
-    }
-
-    final private static function __cache_delete($oObject) 
-    {
-        if (self::$bCaching) {
-            $sClass = get_class($oObject);
-            if (Model::$__debug_cache) {
-                _DEBUG('[C] deleting '.$sClass.' '.$oObject->get('id'));
-            }
-            unset(Model::$__object_cache[$sClass][$oObject->get('id')]);
-        }
-    }
-
-
-    public static $__fields_cache;
-    public static function __get_fields($sClass) 
-    {
-        if (!Model::$__fields_cache[$sClass]['fields']) {
-            $object = new $sClass();
-            Model::$__fields_cache[$sClass]['object']   = $object;
-            Model::$__fields_cache[$sClass]['fields']   = $object->getFields();
-            Model::$__fields_cache[$sClass]['id_field'] = $object->getIdField();
-        }
-    }
-
-    public static function get_fields($sClass) 
-    {
-        if (!Model::$__fields_cache[$sClass]['fields']) {
-            Model::__get_fields($sClass);
-        }
-        return Model::$__fields_cache[$sClass]['fields'];
-    }
-
-    public static function get_id_field($sClass) 
-    {
-        if (!Model::$__fields_cache[$sClass]['id_field']) {
-            Model::__get_fields($sClass);
-        }
-        return Model::$__fields_cache[$sClass]['id_field'];
-    }
-
-
-    public function __get($name) 
-    {
-        if (isset($this->values[$name])) {
-            return $this->values[$name];
-        } else if (isset($this->extraValues[$name])) {
-            return $this->extraValues[$name];
-        } else {
-            return null;
-        }
-    }
-
-    public function __set($name,$value) 
-    {
-        if (in_array($name,$this->fields)) {
-            $this->values[$name]        = $value;
-            if ($this->loaded_values[$key] !== $this->values[$key]) {
-                $this->bDirty = true;
-            }
-        } else {
-            $this->extraValues[$name]   = $value;
-        }
-    }
-
-    public function __call($name,$args) 
-    {
-        if (strtolower(substr($name,0,2)) == 'by') {
-            $name = substr($name,2);
-            if (strlen($name)) {
-                $parts = explode('And',$name);
-                $aWhere = array();
-                foreach ($parts as $i => $k) {
-                    $key = strtolower($k[0]).substr($k,1);
-                    $aWhere[$key] = $args[$i];
-                }
-                if ($i < sizeof($args) - 1) {
-                    $iOffset = $args[$i+1];
-                    $iLimit = $args[$i+2];
-                    $oDB = $args[$i+3];
-                }
-                $sClass = get_class($this);
-                return self::find($sClass,$aWhere,null,$iOffset,$iLimit,$oDB);
-            } else {
-                if (sizeof($args)) {
-                    $iOffset = $args[0];
-                    $iLimit = $args[1];
-                    $oDB = $args[2];
-                }
-                return self::fetch_all($sClass,$iOffset,$iLimit,$oDB);
-            }
-        }
-        die ('<div><b>Fatal Error:</b> unknown method ' . $name . ' in ' . __CLASS__ . '.</div>');
-
-    }
 }
 

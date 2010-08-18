@@ -6,7 +6,7 @@ class SQLiteDBResult extends DBResult
     public function fetch()
     {
         $hRow = sqlite_fetch_array($this->oRes);
-        if ($this->sClass) {
+        if ($this->sClass && $hRow) {
             $sClass = $this->sClass;
             return Model::get_instance($sClass, $hRow);
         }
