@@ -102,14 +102,12 @@ class Engine
         if (file_exists('app/lib/Helpers.php')) {
             include_once('app/lib/Helpers.php');
         }
-
-	    if ($_SERVER['GATEWAY_INTERFACE']) {
-	        $sURL = $_GET['path'];
+	    if (isset($_SERVER['GATEWAY_INTERFACE']) && isset($_GET['path'])) {
+	        $sURL = isset($_GET['path']) ? $_GET['path'] : '/';
 	        $sURL = $sURL[0] == '/' ? substr($sURL, 1) : $sURL;
 	    } else {
             $sURL = $_SERVER['REDIRECT_URL'];
             $sURL = substr($sURL,1);
-
             if ($sURL == 'dispatch.php') {
                 $sURL = $_SERVER['REQUEST_URI'];
                 $sURL = substr($sURL,1);
@@ -122,22 +120,37 @@ class Engine
             }
 	    }
 
+        _DEBUG('Pure URL: '.$sURL);
+
+        $sRoot = $_SERVER['DOCUMENT_ROOT'];
+        $sScript = $_SERVER['SCRIPT_FILENAME'];
+        _DEBUG('Root: '.$sRoot);
+        _DEBUG('Script: '.$sScript);
+        $sIgnore = substr(str_replace($sRoot, '', $sScript), 1);
+        $sIgnore = dirname($sIgnore).'/';
+        $sURL = str_replace($sIgnore, '', $sURL);
+        _DEBUG('Ignore: '.$sIgnore);
+        _DEBUG('Updated URL: \''.$sURL.'\'');
+
         if (strpos($sURL,'.')) {
             $sExt = substr($sURL, strrpos($sURL, '.') + 1);
             $sURL = substr($sURL, 0, strrpos($sURL, '.'));
         }
-        $sExt = $sExt ? $sExt : 'html';
+        $sExt = isset($sExt) ? $sExt : 'html';
         $sExt = strtolower($sExt);
 
         // Do we have mapping?
         $aURLComponents = explode('/',$sURL);
+        //_DEBUG(print_r($_SERVER, 1));
+        _DEBUG(print_r($aURLComponents, 1));
 
         $sController = $aURLComponents[0] ? $aURLComponents[0] : 'Default';
         $sController = str_replace('_',' ',$sController);
         $sController = ucwords($sController);
         $sController = str_replace(' ','',$sController);
+        _DEBUG('Controller: '.$sController);
 
-        $sMethod     = $aURLComponents[1] ? $aURLComponents[1] : 'index';
+        $sMethod     = isset($aURLComponents[1]) ? $aURLComponents[1] : 'index';
         $sMethod     = str_replace('_',' ',$sMethod);
         $sMethod     = ucwords($sMethod);
         $sMethod     = str_replace(' ','',$sMethod);
@@ -150,7 +163,7 @@ class Engine
         if (!file_exists($sControllerPath)) {
             // Do we have mapping? 
             $bFound = false;
-            if ($aAppConfig && $aAppConfig['MAPPING'] && is_array($aAppConfig['MAPPING']) && sizeof($aAppConfig['MAPPING'])) {
+            if ($aAppConfig && isset($aAppConfig['MAPPING']) && is_array($aAppConfig['MAPPING']) && sizeof($aAppConfig['MAPPING'])) {
                 foreach ($aAppConfig['MAPPING'] as $sPattern => $sController) {
                     if (preg_match($sPattern, $sURL)) {
                         $bFound = true;
@@ -169,7 +182,7 @@ class Engine
             }
 
             if (!$bFound) {
-                if ($aAppConfig['NOT_FOUND_CONTROLLER']) {
+                if (isset($aAppConfig['NOT_FOUND_CONTROLLER'])) {
                     $sOrigController = $sController;
                     $sController = $aAppConfig['NOT_FOUND_CONTROLLER'];
                     $sControllerClass = $sController.'Controller';
@@ -183,7 +196,7 @@ class Engine
             }
         }
 
-        $GLOBALS['controller'] = $sOrigController ? $sOrigController : $sController;
+        $GLOBALS['controller'] = isset($sOrigController) ? $sOrigController : $sController;
         $GLOBALS['method']     = $sMethod;
 
         include_once($sControllerPath);
@@ -195,7 +208,7 @@ class Engine
         $__debug = ob_get_contents();
         ob_end_clean();
         if (!$oController->__early_exit) {
-            if (is_array($aNoMethodCheck) && !in_array($sController,$aNoMethodCheck)
+            if (isset($aNoMethodCheck) && is_array($aNoMethodCheck) && !in_array($sController,$aNoMethodCheck)
                     && !method_exists($oController,$sMethod)) {
                 $this->notFound('method '.$sMethod.' not found');
             }
@@ -204,27 +217,27 @@ class Engine
             $oController->set('method',$sMethod);
             $oController->set('extension', $sExt);
 
-            if ($aAppConfig['LOG_SLOW_PAGE']) {
+            if (isset($aAppConfig['LOG_SLOW_PAGE'])) {
                 ob_start(array($this,check_complete));
                 $this->iStart = microtime(true);
             }
 
-            if ($bFound) {
+            if (isset($bFound) && $bFound) {
                 $args = $aURLComponents;
             } else {
                 $args = array_slice($aURLComponents,2);
-                if ($sOrigController) {
+                if (isset($sOrigController)) {
                     array_unshift($args, $sOrigController);
                 }
             }
 
             $oController->$sMethod($args);
-            if ($aAppConfig['LOG_SLOW_PAGE']) {
+            if (isset($aAppConfig['LOG_SLOW_PAGE'])) {
                 $this->iEnd = microtime(true);
                 $this->bCompleted = true;
+                $__debug .= ob_get_contents();
+                ob_end_clean();
             }
-            $__debug .= ob_get_contents();
-            ob_end_clean();
         }
 
         if (method_exists($oController,'postExec')) {

@@ -71,7 +71,7 @@ function create_controller($sName, $sDokinPath, $sPrjPath)
     copy($sDokinPath.'/bin/tmpl/controllers/Controller.php', $sPrjPath.'/app/controllers/'.$sName.'Controller.php');
 
     $sContent = file_get_contents($sPrjPath.'/app/controllers/'.$sName.'Controller.php');
-    $sContent = str_replace('__NAME__', $sName, $sContent);
+    $sContent = str_replace('__NAME__', $sName.'Controller', $sContent);
     file_put_contents($sPrjPath.'/app/controllers/'.$sName.'Controller.php', $sContent);
 
     touch($sPrjPath.'/app/templates/'.strtolower($sName).'.php');
@@ -93,7 +93,8 @@ function clean_r_copy($src,$dst,$excl = array())
         exit;
     }
     while( ($file=readdir($dh)) != false ) {
-        if ($file != '.' && $file != '..' && $file != '.svn') {
+        if ($file != '.' && $file != '..') {
+            if ($file != '.svn' && $file != '.git') {
             $parts = explode('/',$dst);
             array_shift($parts);
             array_shift($parts);
@@ -107,6 +108,7 @@ function clean_r_copy($src,$dst,$excl = array())
                     }
                     shell_exec("cp -a $src$file $dst$file");
                 }
+            }
             }
         }
     }

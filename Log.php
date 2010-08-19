@@ -67,7 +67,7 @@ function __log_message($level,$msg)
         $sPath = getcwd();
     }
 
-    if ($_SERVER['SHELL'] && !$_SERVER['GATEWAY_INTERFACE']) {
+    if (isset($_SERVER['SHELL']) && !$_SERVER['GATEWAY_INTERFACE']) {
         $sMsg = sprintf('[%-7s][%-18s:%5d][%-16s] %s',$level,basename($trace1['file']),$trace1['line'],$trace2['function'],$msg);
         print '['.date('H:i:s').']'.$sMsg."\n";
     } else {
