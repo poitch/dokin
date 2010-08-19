@@ -37,7 +37,7 @@ shell_exec($cmd);
 clean_r_copy($sDokinPath, $sPrjPath.'/dokin', array('tmpl'));
 
 # create required subdirectory
-$aDirs = array('config', 'controllers', 'docroot', 'layouts', 'lib', 'logs', 'models', 'templates');
+$aDirs = array('config', 'controllers', 'docroot', 'layouts', 'lib', 'logs', 'models', 'templates', 'script');
 foreach( $aDirs as $sDir) {
     shell_exec('mkdir -p '.$sPrjPath.'/app/'.$sDir);
 }
@@ -47,6 +47,9 @@ shell_exec('chmod a+w '.$sPrjPath.'/app/logs');
 
 # copy content of tmpl in docroot
 clean_r_copy($sDokinPath.'/bin/tmpl/docroot', $sPrjPath.'/app/docroot');
+
+# copy content of tmpl in script
+clean_r_copy($sDokinPath.'/bin/tmpl/script', $sPrjPath.'/app/script');
 
 # copy content of tmpl/config to config 
 clean_r_copy($sDokinPath.'/bin/tmpl/config', $sPrjPath.'/app/config');

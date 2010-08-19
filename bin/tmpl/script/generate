@@ -1,0 +1,36 @@
+#!/usr/bin/env php
+<?php
+
+$sAppPath = dirname(dirname(__FILE__));
+
+switch ($_SERVER['argv'][1]) {
+    case 'controller':
+        if (!empty($_SERVER['argv'][1])) {
+            create_controller($_SERVER['argv'][2], $sAppPath);
+        }
+    break;
+}
+
+
+function create_controller($sName, $sAppPath)
+{
+    print 'Creating controller '.$sName.PHP_EOL;
+    $sName = str_replace(array('Controller', 'controller'), '', $sName);
+    $sName = ucfirst($sName);
+
+    $sCode = '';
+    $sCode .= '<?php'.PHP_EOL;
+    $sCode .= PHP_EOL;
+    $sCode .= 'class '.$sName.'Controller extends Controller'.PHP_EOL;
+    $sCode .= '{'.PHP_EOL;
+    $sCode .= '    public function index()'.PHP_EOL;
+    $sCode .= '    {'.PHP_EOL;
+    $sCode .= '    }'.PHP_EOL;
+    $sCode .= '}'.PHP_EOL;
+
+    file_put_contents($sAppPath.'/controllers/'.$sName.'Controller.php', $sCode);
+
+    print 'Creating empty template '.strtolower($sName).PHP_EOL;
+    touch($sAppPath.'/templates/'.strtolower($sName).'.php');
+}
+
