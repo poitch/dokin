@@ -1,7 +1,7 @@
 <?php
 /**
  *****************************************************************************
- ** Copyright (c) 2007-2009 Jerome Poichet <jerome@frencaze.com>
+ ** Copyright (c) 2007-2010 Jerome Poichet <jerome@frencaze.com>
  **
  ** This software is supplied to you by Jerome Poichet in consideration of 
  ** your agreement to the following terms, and your use, installation, 
@@ -156,9 +156,14 @@ class Controller
         return $this->sLayout;
     }
 
-    public function redirect($url)
+    public function redirect($sURL, $bPermanent = false)
     {
-        Header('Location: '.$url);
+        if ($bPermanent) {
+            header('HTTP/1.1 301 Moved Permanently', true, 301);
+        } else {
+            header('HTTP/1.1 302 Moved', true, 302);
+        }
+        header('Location: '.$sURL);
         exit();
     }
 
@@ -177,6 +182,26 @@ class Controller
     public function __set($sKey, $sValue)
     {
         $this->set($sKey, $sValue);
+    }
+
+    public function _render($sTemplatePath)
+    { 
+        // Using a layout?
+        $sLayout = $this->getLayout();
+        $sLayout = $sLayout ? $sLayout : strtolower($sController);
+        $sLayoutPath = 'app/layouts/'.$sLayout.'.php';
+
+        if (!file_exists($sLayoutPath)) {
+            $sLayoutPath = 'app/layouts/default.php';
+            if (!file_exists($sLayoutPath)) {
+                // WELL WE ONLY USE THE TEMPLATE
+                include_once($sTemplatePath);
+            } else {
+                include_once($sLayoutPath);
+            }
+        } else {
+            include_once($sLayoutPath);
+        }
     }
 
 }

@@ -1,7 +1,7 @@
 <?php
 /**
  *****************************************************************************
- ** Copyright (c) 2007-2009 Jerome Poichet <jerome@frencaze.com>
+ ** Copyright (c) 2007-2010 Jerome Poichet <jerome@frencaze.com>
  **
  ** This software is supplied to you by Jerome Poichet in consideration of 
  ** your agreement to the following terms, and your use, installation, 
@@ -45,8 +45,8 @@
  **/
 
 
-require_once 'dokin/Config.php';
-require_once 'dokin/DBResult.php';
+require_once DOKIN_DIR.'dokin/Config.php';
+require_once DOKIN_DIR.'dokin/DBResult.php';
 
 class DB 
 {
