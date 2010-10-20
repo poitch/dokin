@@ -39,10 +39,9 @@
 # LIABILITY OR OTHERWISE, EVEN IF JEROME POICHET HAS BEEN ADVISED OF THE 
 # POSSIBILITY OF SUCH DAMAGE.
 
-ErrorDocument 404 /404.html
+ErrorDocument 404 404.html
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteRule ^(.*)$ dispatch.php
 </IfModule>

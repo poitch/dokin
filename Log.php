@@ -1,7 +1,7 @@
 <?php
 /**
  *****************************************************************************
- ** Copyright (c) 2007-2009 Jerome Poichet <jerome@frencaze.com>
+ ** Copyright (c) 2007-2010 Jerome Poichet <jerome@frencaze.com>
  **
  ** This software is supplied to you by Jerome Poichet in consideration of 
  ** your agreement to the following terms, and your use, installation, 
@@ -67,7 +67,7 @@ function __log_message($level,$msg)
         $sPath = getcwd();
     }
 
-    if ($_SERVER['SHELL'] && !$_SERVER['GATEWAY_INTERFACE']) {
+    if (isset($_SERVER['SHELL']) && !$_SERVER['GATEWAY_INTERFACE']) {
         $sMsg = sprintf('[%-7s][%-18s:%5d][%-16s] %s',$level,basename($trace1['file']),$trace1['line'],$trace2['function'],$msg);
         print '['.date('H:i:s').']'.$sMsg."\n";
     } else {

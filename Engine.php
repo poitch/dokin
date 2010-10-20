@@ -1,7 +1,7 @@
 <?php
 /**
  *****************************************************************************
- ** Copyright (c) 2007-2009 Jerome Poichet <jerome@frencaze.com>
+ ** Copyright (c) 2007-2010 Jerome Poichet <jerome@frencaze.com>
  **
  ** This software is supplied to you by Jerome Poichet in consideration of 
  ** your agreement to the following terms, and your use, installation, 
@@ -47,110 +47,97 @@ require_once DOKIN_DIR.'Log.php';
 
 class Engine
 {
-    private $bCompleted = false;
-    private $iStart = 0;
+    public static $aWatches = array();
+    static private $instance = null;
 
     private function __construct()
     {
     }
 
-    public function check_complete($data)
+    public static function get_instance()
     {
-        global $aAppConfig;
-        $sParam = $aAppConfig['LOG_SLOW_REQUEST_PARAM'];
-        if (($sParam && $_REQUEST[$sParam]) || !$sParam) {
-            $d = microtime(true) - $this->iStart;
-            $e = $aAppConfig['LOG_SLOW_TIMEOUT'] !== null ? $aAppConfig['LOG_SLOW_TIMEOUT'] : 8.1;
-            if ($d > $e) {
-                if ($aAppConfig['LOG_SLOW_CALLBACK'] && function_exists($aAppConfig['LOG_SLOW_CALLBACK'])) {
-                    call_user_func($aAppConfig['LOG_SLOW_CALLBACK'],$this->iStart,$this->iEnd,self::$aWatches);
-                } else {
-                    $q = DB::get_queries();
-                    $t = DB::get_total_time();
-                    $sMsg = '';
-                    $sMsg .= ' - '.(sizeof($q)).' DB Queries in '.round($t*1000,2).'ms';
-                    if ($this->iEnd  && $this->iEnd > $this->iStart) {
-                        $sMsg .= ' - method call '.round(($this->iEnd - $this->iStart)*1000,2).'ms';
-                    }
-                    foreach( self::$aWatches as $k => $v ) {
-                        $sMsg .= ' - '.$k.' '.round(1000*$v,2).' ms';
-                    }
-                    _INFO('Slow Page ('.round($d*1000,2).'ms) '.$_SERVER['REQUEST_URI'].$sMsg);
-
-                    if ($aAppConfig['TARGET'] == 'dev') {
-                        foreach( $q as $h ) { 
-                            if ($h['query']) {
-                                _DEBUG('    '.$h['function'].' '.$h['query'].' '.round(1000*$h['time'],2).'ms');
-                            }
-                        }
-                    }
-                }
-            }
+        if (!self::$instance) {
+            self::$instance = new Engine();
         }
-        return $data;
+        return self::$instance;
     }
 
-    function run()
+    public function run()
     {
         global $aAppConfig;
 
-        $mtime = microtime();
-        $mtime = explode(" ",$mtime);
-        $mtime = $mtime[1] + $mtime[0];
-        $starttime = $mtime;
+        $iStartTime = microtime(true);
 
         if (file_exists('app/lib/Helpers.php')) {
             include_once('app/lib/Helpers.php');
         }
 
-	    if ($_SERVER['GATEWAY_INTERFACE']) {
-	        $sURL = $_GET['path'];
+        // Retrieve the URL, remove the leading /
+	    if (isset($_SERVER['GATEWAY_INTERFACE']) && isset($_GET['path'])) {
+            // FCGI MODE
+	        $sURL = isset($_GET['path']) ? $_GET['path'] : '/';
 	        $sURL = $sURL[0] == '/' ? substr($sURL, 1) : $sURL;
 	    } else {
+            // MOD_PHP MODE
             $sURL = $_SERVER['REDIRECT_URL'];
-            $sURL = substr($sURL,1);
+            $sURL = substr($sURL, 1);
 
             if ($sURL == 'dispatch.php') {
                 $sURL = $_SERVER['REQUEST_URI'];
-                $sURL = substr($sURL,1);
+                $sURL = substr($sURL, 1);
+
+                // Remove query string
                 if (strstr($sURL,'?')) {
-                    $sURL = substr($sURL,0,strpos($sURL,'?'));
+                    $sURL = substr($sURL, 0, strpos($sURL, '?'));
                 }
-                if (strstr($sURL,'&')) {
-                    $sURL = substr($sURL,0,strpos($sURL,'&'));
+                if (strstr($sURL, '&')) {
+                    $sURL = substr($sURL, 0, strpos($sURL, '&'));
                 }
             }
 	    }
 
+        // Clean up the URL from the path where the application actually is
+        $sRoot = $_SERVER['DOCUMENT_ROOT'];
+        $sScript = $_SERVER['SCRIPT_FILENAME'];
+        $sIgnore = substr(str_replace($sRoot, '', $sScript), 1);
+        $sIgnore = dirname($sIgnore).'/';
+        $sURL = str_replace($sIgnore, '', $sURL);
+
+        // Ignore the extension
         if (strpos($sURL,'.')) {
             $sExt = substr($sURL, strrpos($sURL, '.') + 1);
             $sURL = substr($sURL, 0, strrpos($sURL, '.'));
         }
-        $sExt = $sExt ? $sExt : 'html';
+        $sExt = isset($sExt) ? $sExt : 'html';
         $sExt = strtolower($sExt);
 
-        // Do we have mapping?
-        $aURLComponents = explode('/',$sURL);
+        // Explode the URL to figure out the controller and method being called
+        $aURLComponents = explode('/', $sURL);
 
+        // Underscores and dashes are replaced by spaces, then camel case
         $sController = $aURLComponents[0] ? $aURLComponents[0] : 'Default';
-        $sController = str_replace('_',' ',$sController);
+        $sController = str_replace(array('_', '-'), ' ', $sController);
         $sController = ucwords($sController);
-        $sController = str_replace(' ','',$sController);
+        $sController = str_replace(' ', '', $sController);
 
-        $sMethod     = $aURLComponents[1] ? $aURLComponents[1] : 'index';
-        $sMethod     = str_replace('_',' ',$sMethod);
-        $sMethod     = ucwords($sMethod);
-        $sMethod     = str_replace(' ','',$sMethod);
-        $sMethod     = str_replace('.','',$sMethod);
-        $sMethod     = strtolower(substr($sMethod,0,1)).substr($sMethod,1);
-        $sMethod     = is_numeric($sMethod) ? 'n'.$sMethod : $sMethod;
+        // Underscores and dashes are replaced by spaces, periods are ignored
+        // numbers will be preceded with n
+        $sMethod = isset($aURLComponents[1]) ? $aURLComponents[1] : 'index';
+        $sMethod = str_replace(array('_', '-'), ' ', $sMethod);
+        $sMethod = ucwords($sMethod);
+        $sMethod = str_replace(' ', '', $sMethod);
+        $sMethod = str_replace('.', '', $sMethod);
+        $sMethod = strtolower(substr($sMethod, 0, 1)).substr($sMethod,1);
+        $sMethod = is_numeric($sMethod) ? 'n'.$sMethod : $sMethod;
 
+        // Determine controller class and path
         $sControllerClass = $sController.'Controller';
         $sControllerPath = 'app/controllers/'.$sControllerClass.'.php';
+
         if (!file_exists($sControllerPath)) {
-            // Do we have mapping? 
-            $bFound = false;
-            if ($aAppConfig && $aAppConfig['MAPPING'] && is_array($aAppConfig['MAPPING']) && sizeof($aAppConfig['MAPPING'])) {
+            // Analyze routes 
+            // TODO improve routing
+            if (isset($aAppConfig['MAPPING']) && is_array($aAppConfig['MAPPING'])) {
                 foreach ($aAppConfig['MAPPING'] as $sPattern => $sController) {
                     if (preg_match($sPattern, $sURL)) {
                         $bFound = true;
@@ -165,26 +152,12 @@ class Engine
             $sControllerClass = $sController.'Controller';
             $sControllerPath = 'app/controllers/'.$sControllerClass.'.php';
             if (!file_exists($sControllerPath)) {
-                $bFound = false;
-            }
-
-            if (!$bFound) {
-                if ($aAppConfig['NOT_FOUND_CONTROLLER']) {
-                    $sOrigController = $sController;
-                    $sController = $aAppConfig['NOT_FOUND_CONTROLLER'];
-                    $sControllerClass = $sController.'Controller';
-                    $sControllerPath = 'app/controllers/'.$sControllerClass.'.php';
-                    if (!file_exists($sControllerPath)) {
-                        $this->notFound('controller '.$sOrigController.' not found');
-                    }
-                } else {
-                    $this->notFound('controller '.$sController.' not found');
-                }
+                $this->notFound('controller '.$sController.' not found');
             }
         }
 
-        $GLOBALS['controller'] = $sOrigController ? $sOrigController : $sController;
-        $GLOBALS['method']     = $sMethod;
+        $GLOBALS['controller'] = $sController;
+        $GLOBALS['method'] = $sMethod;
 
         include_once($sControllerPath);
         if ($aAppConfig['TARGET'] == 'dev') {
@@ -194,40 +167,25 @@ class Engine
         $oController = new $sControllerClass();
         $__debug = ob_get_contents();
         ob_end_clean();
+
         if (!$oController->__early_exit) {
-            if (is_array($aNoMethodCheck) && !in_array($sController,$aNoMethodCheck)
-                    && !method_exists($oController,$sMethod)) {
+            if (!method_exists($oController, $sMethod)) {
                 $this->notFound('method '.$sMethod.' not found');
             }
 
-            $oController->set('controller',$sController);
-            $oController->set('method',$sMethod);
+            $oController->set('controller', $sController);
+            $oController->set('method', $sMethod);
             $oController->set('extension', $sExt);
 
-            if ($aAppConfig['LOG_SLOW_PAGE']) {
-                ob_start(array($this,check_complete));
-                $this->iStart = microtime(true);
+            if (method_exists($oController, 'preExec')) {
+                $oController->preExec();
             }
 
-            if ($bFound) {
-                $args = $aURLComponents;
-            } else {
-                $args = array_slice($aURLComponents,2);
-                if ($sOrigController) {
-                    array_unshift($args, $sOrigController);
-                }
-            }
-
+            $aArgs = array_slice($aURLComponents,2);
             $oController->$sMethod($args);
-            if ($aAppConfig['LOG_SLOW_PAGE']) {
-                $this->iEnd = microtime(true);
-                $this->bCompleted = true;
-            }
-            $__debug .= ob_get_contents();
-            ob_end_clean();
         }
 
-        if (method_exists($oController,'postExec')) {
+        if (method_exists($oController, 'postExec')) {
             $oController->postExec();
         }
 
@@ -241,67 +199,45 @@ class Engine
 
         $GLOBALS['_content_template'] = $sTemplate;
 
-        $mtime = microtime();
-        $mtime = explode(" ",$mtime);
-        $mtime = $mtime[1] + $mtime[0];
-        $endtime = $mtime;
-        $totaltime = ($endtime - $starttime); 
+        $iEndTime = microtime(true);
+        $iTotalTime = $iEndTime - $iStartTime;
 
-        $oController->set('time_elapsed',$totaltime);
-        $oController->set('__data',$oController->get()); 
-        $oController->set('queries',DB::get_query_count());
-        $oController->set('aQueries',DB::get_queries());
-        $oController->set('__debug',$__debug);
+        /*
+        $oController->set('time_elapsed', $iTotalTime);
+        $oController->set('__data', $oController->get()); 
+        $oController->set('queries', DB::get_query_count());
+        $oController->set('aQueries', DB::get_queries());
+        $oController->set('__debug', $__debug);
+        */
 
         extract($oController->get());
 
-        // LAYOUT
-        $sLayout = $oController->getLayout();
-        $sLayout = $sLayout ? $sLayout : strtolower($sController);
-        $sLayoutPath = 'app/layouts/'.$sLayout.'.php';
-        if (!file_exists($sLayoutPath)) {
-            $sLayoutPath = 'app/layouts/default.php';
-            if (!file_exists($sLayoutPath)) {
-                // WELL WE ONLY USE THE TEMPLATE
-                include_once($sTemplatePath);
-            } else {
-                include_once($sLayoutPath);
-            }
-        } else {
-            include_once($sLayoutPath);
+        // Rendering
+        if (method_exists($oController, 'preRender')) {
+            $oController->preRender();
         }
-    }
 
-    function notFound($msg)
-    {
-        if (true) {
-            header("HTTP/1.1 404 Not Found");
-            header("Location: /404.html");
-            _ERROR($msg);
-            exit();
-        } else {
-            throw new Exception($msg);
+        ob_start();
+        $oController->_render($sTemplatePath);
+        $sContent = ob_get_contents();
+        ob_end_clean();
+
+        if (method_exists($oController, 'postRender')) {
+            $sContent = $oController->postRender($sContent);
         }
+
+        print $sContent;
     }
 
-    static private $instance = null;
-
-    public static function get_instance()
+    public function notFound($msg)
     {
-        if (!self::$instance) {
-            self::$instance = new Engine();
-        }
-        return self::$instance;
+        // XXX configure 404 page
+        header('HTTP/1.1 404 Not Found', true, 404);
+        header('Location: /404.html');
+        _ERROR($msg);
+        exit();
     }
 
-    public static function complete()
-    {
-        $o = self::get_instance();
-        $o->bCompleted = true;
-    }
-
-
-    public static $aWatches = array();
     public static function watch_start($k)
     {
         self::$aWatches[$k] = microtime(true);
@@ -311,6 +247,5 @@ class Engine
     {
         self::$aWatches[$k] = microtime(true) - self::$aWatches[$k];
     }
-
 }
 
