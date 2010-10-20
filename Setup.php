@@ -44,18 +44,20 @@
  *****************************************************************************
  **/
 
+$sDokinDir = dirname(__FILE__).'/';
 
-define('DOKIN_DIR','./dokin/');
-define('DOKIN_PLUGINS_DIR','./dokin/plugins/');
-define('APP_DIR','./app/');
-define('CONFIG_DIR','./app/config/');
-define('CONTROLLERS_DIR','./app/controllers/');
-define('CONTROLLER_DIR','./app/controllers/');
-define('MODELS_DIR','./app/models/');
-define('MODEL_DIR','./app/models/');
-define('TEMPLATES_DIR','./app/templates/');
-define('TEMPLATE_DIR','./app/templates/');
-define('LIB_DIR','./app/lib/');
+
+define('DOKIN_DIR', $sDokinDir);
+define('DOKIN_PLUGINS_DIR', DOKIN_DIR.'plugins/');
+define('APP_DIR', './app/');
+define('CONFIG_DIR', './app/config/');
+define('CONTROLLERS_DIR', './app/controllers/');
+define('CONTROLLER_DIR', './app/controllers/');
+define('MODELS_DIR', './app/models/');
+define('MODEL_DIR', './app/models/');
+define('TEMPLATES_DIR', './app/templates/');
+define('TEMPLATE_DIR', './app/templates/');
+define('LIB_DIR', './app/lib/');
 
 require_once DOKIN_DIR.'Engine.php';
 require_once DOKIN_DIR.'EngineHelpers.php';

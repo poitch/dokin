@@ -45,8 +45,8 @@
  **/
 
 
-require_once 'dokin/Config.php';
-require_once 'dokin/DBResult.php';
+require_once DOKIN_DIR.'Config.php';
+require_once DOKIN_DIR.'DBResult.php';
 
 class DB 
 {

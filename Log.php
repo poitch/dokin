@@ -115,10 +115,7 @@ function __log_message($level,$msg)
 
 function _DEBUG($msg)
 {
-    global $aAppConfig;
-    if ($aAppConfig['TARGET'] == 'dev' || $_SERVER['SHELL']) {
-        __log_message('DEBUG',$msg);
-    }
+   __log_message('DEBUG',$msg);
 }
 
 function _INFO($msg)
