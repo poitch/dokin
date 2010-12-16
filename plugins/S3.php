@@ -419,14 +419,17 @@ class S3
         $aHeaders[] = 'Pragma:';
         $aHeaders[] = 'Accept:';
         $aHeaders[] = 'Content-Type:';
-        $aHeaders[] = 'Content-Length:';
+        $aHeaders[] = 'Expect:';
+        $aHeaders[] = 'Connection: close';
+        $aHeaders[] = 'Date: '.$this->sDate;
+        $aHeaders[] = 'Authorization: AWS '.$this->sKey.':'.$sig;
 
         if (!is_array($params) && strlen($params) > 1) {
             $aHeaders[] = 'Content-Length:'.strlen($params);
+        } else {
+            $aHeaders[] = 'Content-Length:';
         }
 
-        $aHeaders[] = 'Date: '.$this->sDate;
-        $aHeaders[] = 'Authorization: AWS '.$this->sKey.':'.$sig;
 
         if (isset($req['acl'])) {
             $aHeaders[] = 'x-amz-acl: '.$req['acl'];
@@ -451,6 +454,7 @@ class S3
         // This is the maximum execution time fo the curl_exec function ...
         //TODO curl_setopt($oCurl, CURLOPT_TIMEOUT, 30);
         curl_setopt($oCurl,CURLOPT_CONNECTTIMEOUT,4); 
+        curl_setopt($oCurl, CURLOPT_VERBOSE, 1);
 
         if ($req['upload']) {
             $fd = fopen($req['upload'],'rb');
@@ -540,6 +544,7 @@ class S3
         $hStats['content_type']            = curl_getinfo($oCurl, CURLINFO_CONTENT_TYPE);
 
         $hResult['stats'] = $hStats;
+        curl_close($oCurl);
 
         return $hResult;
     }

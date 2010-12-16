@@ -64,6 +64,7 @@ abstract class SQLBaseDriver extends DBDriver
         $hWhere = $hTree['WHERE'];
         $hSet = $hTree['SET'];
         $sIdField = $hTree['IDFIELD'];
+        $aOrder = $hTree['ORDER'];
 
         $sQuery = '';
         if ($sCommand == SQL_COMMAND_SELECT) {
@@ -75,9 +76,11 @@ abstract class SQLBaseDriver extends DBDriver
         } else if ($sCommand == SQL_COMMAND_INSERT) {
             $aFields = $oModel->getFields();
             $hValues = $oModel->getValues();
+            $aValues = array();
             foreach ($aFields as $i => $sField) {
                 if (isset($hValues[$sField])) {
                     $hValues[$sField] = $this->escape($oModel->$sField);
+                    $aValues[] = $hValues[$sField];
                 } else {
                     unset($aFields[$i]);
                     unset($hValues[$sField]);
@@ -86,7 +89,7 @@ abstract class SQLBaseDriver extends DBDriver
 
             $sQuery  = 'INSERT INTO '.$sTable.' ';
             $sQuery .= '('.implode(',',$aFields).') VALUES ';
-            $sQuery .= '(\''.implode('\',\'',$hValues).'\')';
+            $sQuery .= '(\''.implode('\',\'',$aValues).'\')';
             $sQuery = str_replace('\'NOW()\'','NOW()',$sQuery);
         }
 
@@ -125,6 +128,10 @@ abstract class SQLBaseDriver extends DBDriver
                 if ($oModel->$sIdField !== null) {
                     $sQuery .= ' WHERE '.$sIdField.'='.$oModel->$sIdField;
                 }
+            }
+
+            if ($sCommand == SQL_COMMAND_SELECT && $aOrder) {
+                $sQuery .= ' ORDER BY '.implode('DESC ,', $aOrder).' DESC';
             }
         }
 

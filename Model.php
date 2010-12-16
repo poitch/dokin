@@ -67,6 +67,7 @@ class Model
     protected $aAnd = null;
     protected $aOr = null;
     protected $aSet = null;
+    protected $aOrder = null;
 
     public function __construct($mObj = null)
     {
@@ -120,7 +121,6 @@ class Model
                     trigger_error($sKey.' is not a public member', E_USER_ERROR);
                 }
             }
-            print_r($aProps);
 
             $this->hExtraValues[$sKey] = $sValue;
         }
@@ -176,6 +176,7 @@ class Model
             'WHERE' => $this->aAnd,
             'SET' => $this->aSet,
             'IDFIELD' => $this->sIdField,
+            'ORDER' => $this->aOrder,
         );
     }
 
@@ -288,6 +289,13 @@ class Model
 
     public function having()
     {
+        return $this;
+    }
+
+    public function order($mOrder)
+    {
+        // FIXME
+        $this->aOrder = is_array($mOrder) ? $mOrder : array($mOrder);
         return $this;
     }
 

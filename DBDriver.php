@@ -52,7 +52,7 @@ require_once DOKIN_DIR.'drivers/MongoDriver.php';
 abstract class DBDriver
 {
     abstract public function exec($oModel);
-    abstract public function query($sQuery, $sClass);
+    abstract public function query($sQuery, $sClass = null);
     abstract public function escape($sString);
     abstract public function lastId();
 

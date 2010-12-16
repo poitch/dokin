@@ -52,8 +52,7 @@ class SQLiteDBResult extends DBResult
     {
         $hRow = sqlite_fetch_array($this->oRes);
         if ($this->sClass && $hRow) {
-            $sClass = $this->sClass;
-            return Model::get_instance($sClass, $hRow);
+            return Model::get_instance($this->sClass, $hRow);
         }
         return $hRow;
     }

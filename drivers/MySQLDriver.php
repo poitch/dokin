@@ -67,7 +67,7 @@ class MySQLDriver extends SQLBaseDriver
         return mysql_insert_id($this->db);
     }
 
-    public function query($sQuery, $sClass)
+    public function query($sQuery, $sClass = null)
     {
         print '[mysql] Query: '.$sQuery.PHP_EOL;
     }

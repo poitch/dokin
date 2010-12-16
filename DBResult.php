@@ -49,7 +49,7 @@ abstract class DBResult
 {
     protected $oRes;
     protected $sClass;
-    public function __construct($oRes, $sClass)
+    public function __construct($oRes, $sClass = null)
     {
         $this->oRes = $oRes;
         $this->sClass = $sClass;

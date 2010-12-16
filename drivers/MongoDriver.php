@@ -93,7 +93,7 @@ class MongoDriver extends DBDriver
         }
     }
 
-    public function query($sQuery, $sClass)
+    public function query($sQuery, $sClass = null)
     {
     }
 

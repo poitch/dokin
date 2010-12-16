@@ -66,11 +66,12 @@ class SQLiteDriver extends SQLBaseDriver
         return sqlite_last_insert_rowid($this->db);
     }
 
-    public function query($sQuery, $sClass)
+    public function query($sQuery, $sClass = null)
     {
-        print '[sqlite] Query '.$sQuery.PHP_EOL;
+        _DEBUG('[sqlite] Query '.$sQuery);
         $oRes = sqlite_query($this->db, $sQuery, SQLITE_ASSOC, $sError);
         if ($oRes === false) {
+            _ERROR('[sqlite] failed '.$sError);
             throw new Exception($sError);
         }
 
