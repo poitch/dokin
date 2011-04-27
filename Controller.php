@@ -184,12 +184,19 @@ class Controller
         $this->set($sKey, $sValue);
     }
 
-    public function _render($sTemplatePath)
+    public function _render($sTemplatePath, $hData = array())
     { 
+        extract($this->get());
+        extract($hData);
+
         // Using a layout?
         $sLayout = $this->getLayout();
         $sLayout = $sLayout ? $sLayout : strtolower($sController);
-        $sLayoutPath = 'app/layouts/'.$sLayout.'.php';
+        if (substr($sLayout, -4) == '.php') {
+            $sLayoutPath = 'app/layouts/'.$sLayout;
+        } else {
+            $sLayoutPath = 'app/layouts/'.$sLayout.'.php';
+        }
 
         if (!file_exists($sLayoutPath)) {
             $sLayoutPath = 'app/layouts/default.php';

@@ -210,8 +210,6 @@ class Engine
         $oController->set('__debug', $__debug);
         */
 
-        extract($oController->get());
-
         // Rendering
         if (method_exists($oController, 'preRender')) {
             $oController->preRender();

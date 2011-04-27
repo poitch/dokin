@@ -46,7 +46,7 @@
 
 
 require_once DOKIN_DIR.'drivers/SQLBaseDriver.php';
-require_once DOKIN_DIR.'DBDriver.php';
+require_once DOKIN_DIR.'drivers/MySQLDBResult.php';
 
 class MySQLDriver extends SQLBaseDriver
 {
@@ -69,7 +69,12 @@ class MySQLDriver extends SQLBaseDriver
 
     public function query($sQuery, $sClass = null)
     {
-        print '[mysql] Query: '.$sQuery.PHP_EOL;
+        _DEBUG('[mysql] Query ('.$sClass.') : '.$sQuery);
+        $oRes = mysql_query($sQuery);
+        if ($oRes === false) {
+            throw new Exception('Failed '.mysql_error());
+        }
+        return new MySQLDBResult($oRes, $sClass);
     }
 }
 

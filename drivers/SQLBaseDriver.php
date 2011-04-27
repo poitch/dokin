@@ -48,18 +48,15 @@ require_once DOKIN_DIR.'DBDriver.php';
 
 abstract class SQLBaseDriver extends DBDriver
 {
-    private $db;
-
-    protected function __construct($hConfig)
-    {
-        $this->db = sqlite_open($hConfig['filename']);
-    }
-
     public function exec($oModel)
     {
         $hTree = $oModel->getTree();
         $sClass = get_class($oModel);
+        $sDatabase = $oModel->getDB();
         $sTable = $oModel->getTable();
+        if ($sDatabase != null) {
+            $sTable = $sDatabase . '.' . $sTable;
+        }
         $sCommand = $hTree['COMMAND'];
         $hWhere = $hTree['WHERE'];
         $hSet = $hTree['SET'];
@@ -118,6 +115,12 @@ abstract class SQLBaseDriver extends DBDriver
                         $aWhereParts[] = $sKey . ' IS NULL';
                     } else if (is_numeric($sValue)) {
                         $aWhereParts[] = $sKey.'='.$this->escape($sValue);
+                    } else if (is_array($sValue)) {
+                        $aEscaped = array();
+                        foreach ($sValue as $sVal) {
+                            $sEscaped[] = $this->escape($sVal);
+                        }
+                        $aWhereParts[] = $sKey.' IN (\''.implode('\',\'', $aEscaped).'\')';
                     } else {
                         $aWhereParts[] = $sKey.'=\''.$this->escape($sValue).'\'';
                     }

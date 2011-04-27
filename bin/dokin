@@ -1,83 +1,105 @@
 #!/usr/bin/env php
 <?php
-
 $sDokinPath = dirname(dirname(__FILE__));
+require_once($sDokinPath.'/Terminal.php');
 
-$argc = $_SERVER['argc'];
-$argv = $_SERVER['argv'];
+$iArgc = $_SERVER['argc'];
+$aArgv = $_SERVER['argv'];
 
-if ($argc!=2) {
+// dokin action <parameters>
+if ($iArgc < 2) {
     usage();
     exit;
 }
 
-// Determine Project Path
-$sPrjPath = $argv[1];
-$sPrjParentPath = realpath(dirname($argv[1]));
-$sPrjPath = $sPrjParentPath.'/'.basename($sPrjPath);
-$sPrj = basename($sPrjPath);
+$sAction = strtolower($aArgv[1]);
 
-_P('Project Path: '.$sPrjPath);
-_P('Parent Path : '.$sPrjParentPath);
-_P('Project Name: '.$sPrj);
-_P('Dokin Path  : '.$sDokinPath);
-
-if (file_exists($sPrjPath)) {
-    _P($sPrjPath.' already exists');
-    exit;
+if ($sAction == 'new') {
+    // TODO validate
+    new_application($aArgv[2], $sDokinPath);
 }
 
-_P('Generating '.$sPrj);
 
-# Create dokin
-$cmd = 'mkdir -p '.$sPrjPath.'/dokin';
-shell_exec($cmd);
+function new_application($sPrjPath, $sDokinPath)
+{
+    // Determine Project Path
+    $sPrjParentPath = realpath(dirname($sPrjPath));
+    $sPrjPath = $sPrjParentPath.'/'.basename($sPrjPath);
+    $sPrj = basename($sPrjPath);
 
-# copy dokin itself
-clean_r_copy($sDokinPath, $sPrjPath.'/dokin', array('tmpl'));
+    //_P('Project Path: '.$sPrjPath);
+    //_P('Parent Path : '.$sPrjParentPath);
+    //_P('Project Name: '.$sPrj);
+    //_P('Dokin Path  : '.$sDokinPath);
 
-# create required subdirectory
-$aDirs = array('config', 'controllers', 'docroot', 'layouts', 'lib', 'logs', 'models', 'templates', 'script');
-foreach( $aDirs as $sDir) {
-    shell_exec('mkdir -p '.$sPrjPath.'/app/'.$sDir);
+    if (file_exists($sPrjPath)) {
+        _P($sPrjPath.' already exists');
+        exit;
+    }
+
+    _P(green("Generating ").$sPrj);
+
+    # Create dokin
+    _P(green("\tCopying").' dokin');
+    if (!mkdir($sPrjPath.'/dokin', 0777, true)) {
+        _P(red("\tFailed"));
+        return;
+    }
+
+    # copy dokin itself
+    clean_r_copy($sDokinPath, $sPrjPath.'/dokin', array('tmpl'));
+
+    # create required subdirectory
+    $aDirs = array('config', 'controllers', 'docroot', 'layouts', 'lib', 'logs', 'models', 'templates', 'script');
+    foreach( $aDirs as $sDir) {
+        _P(green("\tCreating ").$sDir);
+        mkdir($sPrjPath.'/app/'.$sDir, 0777, true);
+    }
+
+    # Make logs writable by everybody
+    _P(grey("\tWritable").' logs directory');
+    shell_exec('chmod a+w '.$sPrjPath.'/app/logs');
+
+    # copy content of tmpl in docroot
+    _P(green("\tPopulating").' docroot');
+    clean_r_copy($sDokinPath.'/bin/tmpl/docroot', $sPrjPath.'/app/docroot');
+
+    # copy content of tmpl in script
+    _P(green("\tPopulating").' script');
+    clean_r_copy($sDokinPath.'/bin/tmpl/script', $sPrjPath.'/app/script');
+
+    # copy content of tmpl/config to config 
+    _P(green("\tPopulating").' config');
+    clean_r_copy($sDokinPath.'/bin/tmpl/config', $sPrjPath.'/app/config');
+
+    # replace __prj__ with $prj
+    if (file_exists($sPrjPath.'/app/config/DBConfig.php')) {
+        $sContent = file_get_contents($sPrjPath.'/app/config/DBConfig.php');
+        $sContent = str_replace('__prj__', $sPrj, $sContent);
+        file_put_contents($sPrjPath.'/app/config/DBConfig.php', $sContent);
+    }
+
+    # Create a default controller/template
+    create_controller('Default', $sDokinPath, $sPrjPath);
 }
-
-# Make logs writable by everybody
-shell_exec('chmod a+w '.$sPrjPath.'/app/logs');
-
-# copy content of tmpl in docroot
-clean_r_copy($sDokinPath.'/bin/tmpl/docroot', $sPrjPath.'/app/docroot');
-
-# copy content of tmpl in script
-clean_r_copy($sDokinPath.'/bin/tmpl/script', $sPrjPath.'/app/script');
-
-# copy content of tmpl/config to config 
-clean_r_copy($sDokinPath.'/bin/tmpl/config', $sPrjPath.'/app/config');
-
-# replace __prj__ with $prj
-if (file_exists($sPrjPath.'/app/config/DBConfig.php')) {
-    $sContent = file_get_contents($sPrjPath.'/app/config/DBConfig.php');
-    $sContent = str_replace('__prj__', $sPrj, $sContent);
-    file_put_contents($sPrjPath.'/app/config/DBConfig.php', $sContent);
-}
-
-# Create a default controller/template
-create_controller('Default', $sDokinPath, $sPrjPath);
 
 function create_controller($sName, $sDokinPath, $sPrjPath)
 {
+    _P(green("\tGenerating controller").' '.$sName);
     $sName = str_replace(array('Controller', 'controller'), '', $sName);
     $sName = ucfirst($sName);
     copy($sDokinPath.'/bin/tmpl/controllers/Controller.php', $sPrjPath.'/app/controllers/'.$sName.'Controller.php');
 
     $sContent = file_get_contents($sPrjPath.'/app/controllers/'.$sName.'Controller.php');
     $sContent = str_replace('__NAME__', $sName.'Controller', $sContent);
+    _P(grey("\tCreating").' app/controllers/'.$sName.'Controller.php');
     file_put_contents($sPrjPath.'/app/controllers/'.$sName.'Controller.php', $sContent);
 
+    _P(grey("\tCreating").' app/templates/'.$sName.'.php');
     touch($sPrjPath.'/app/templates/'.strtolower($sName).'.php');
 }
 
-function clean_r_copy($src,$dst,$excl = array()) 
+function clean_r_copy($src, $dst, $excl = array()) 
 {
     if ($src[strlen($src)-1] != '/') {
         $src .= '/';
@@ -95,20 +117,20 @@ function clean_r_copy($src,$dst,$excl = array())
     while( ($file=readdir($dh)) != false ) {
         if ($file != '.' && $file != '..') {
             if ($file != '.svn' && $file != '.git') {
-            $parts = explode('/',$dst);
-            array_shift($parts);
-            array_shift($parts);
-            $n = implode('/',$parts);
-            if (!in_array($file,$excl) && !in_array($n.$file,$excl)) {
-                if (is_dir($src.$file)) {
-                    clean_r_copy($src.$file,$dst.$file,$excl);
-                } else {
-                    if (!file_exists($dst)) {
-                        shell_exec("mkdir -p $dst");
+                $parts = explode('/',$dst);
+                array_shift($parts);
+                array_shift($parts);
+                $n = implode('/',$parts);
+                if (!in_array($file,$excl) && !in_array($n.$file,$excl)) {
+                    if (is_dir($src.$file)) {
+                        clean_r_copy($src.$file,$dst.$file,$excl);
+                    } else {
+                        if (!file_exists($dst)) {
+                            mkdir($dst, 0777, true);
+                        }
+                        shell_exec("cp -a $src$file $dst$file");
                     }
-                    shell_exec("cp -a $src$file $dst$file");
                 }
-            }
             }
         }
     }
@@ -118,11 +140,11 @@ function clean_r_copy($src,$dst,$excl = array())
 
 function usage() 
 {
-    print "dokin <project>\n";
+    print 'dokin new <project>'.PHP_EOL;
 }
 
 function _P($msg) 
 {
-    print "$msg\n";
+    print $msg.PHP_EOL;
 }
 
